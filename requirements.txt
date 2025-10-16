@@ -1,0 +1,8 @@
+djangorestframework
+cryptography
+celery[redis]
+redis
+requests
+websocket-client
+python-binance
+psycopg2-binary
