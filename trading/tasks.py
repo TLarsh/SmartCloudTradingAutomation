@@ -19,7 +19,7 @@ def process_signal_task(self, user_id, broker_account_id, signal_id):
         return {"status": False, "message": "Signal not found"}
 
     payload = signal.payload
-    # fetch the broker account
+    
     try:
         account = BrokerAccount.objects.get(id=broker_account_id, user_id=user_id)
     except BrokerAccount.DoesNotExist:

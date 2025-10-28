@@ -5,15 +5,21 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 
-from .serializers import RegisterSerializer, BrokerAccountSerializer
+from .serializers import RegisterSerializer, BrokerAccountSerializer, ListBrokerSerializer
 from .models import Signal, BrokerAccount
 from .utils import require_user_key
 from .tasks import process_signal_task
+
+from .ui.user_ui import user_register_schema
+from .ui.broker_ui import broker_register_schema
+from .ui.signal_ui import signal_webhook_schema
 
 User = get_user_model()
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+
+    @user_register_schema
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -26,6 +32,9 @@ class AddBrokerView(APIView):
     """
     Requires header X-USER-KEY and user_email (in body or header)
     """
+
+    @broker_register_schema
+
     def post(self, request):
         user = require_user_key(request)
         if not user:
@@ -38,9 +47,22 @@ class AddBrokerView(APIView):
         account = serializer.save()
         return Response({"message":"Broker account added","status":True,"data":{"id":account.id,"provider":account.provider,"display_name":account.display_name},"errors":None}, status=201)
 
+class BrokerAccounts(APIView):
+    def get(self, request):
+        brokers = BrokerAccount.objects.all()
+        serializer = ListBrokerSerializer(brokers, many=True)
+        return Response({
+            "message": 'Broker accounts retrieved successfully',
+            'status': True,
+            'data': serializer.data,
+            'errors': None,
+        }, status=200)
+
+
 class SignalWebhookView(APIView):
     permission_classes = [AllowAny]
 
+    @signal_webhook_schema
     def post(self, request):
         
         user = require_user_key(request)
@@ -73,3 +95,20 @@ class SignalWebhookView(APIView):
         process_signal_task.delay(user.id, broker_account_id, signal.id)
 
         return Response({"message":"Signal accepted and queued for execution","status":True,"data":{"webhook_id":webhook_id},"errors":None}, status=202)
+    
+    def get(self, request):
+        signals = Signal.objects.all()
+        for signal in signals:
+            return Response({
+            "message": 'Broker accounts retrieved successfully',
+            'status': True,
+            'data': {
+                'webhook_id':signal.webhook_id,
+                'user':signal.user.email,
+                'payload':signal.payload,
+                'processed':signal.processed,
+                'result':signal.result
+            },
+            'errors': None,
+        }, status=200)
+

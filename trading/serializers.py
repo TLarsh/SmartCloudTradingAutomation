@@ -2,15 +2,19 @@ from rest_framework import serializers
 from .models import User, BrokerAccount
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = User
-        fields = ('email', 'password', 'full_name')
+        fields = (
+            'email',
+            'password', 
+            'full_name'
+            )
 
     def create(self, validated_data):
         user = User.objects.create_user(
             email=validated_data['email'],
-            password=validated_data['password'],
+            password=validated_data.pop('password', None),
             full_name=validated_data.get('full_name', '')
         )
         return user
@@ -19,10 +23,11 @@ class BrokerAccountSerializer(serializers.ModelSerializer):
     api_key = serializers.CharField(write_only=True)
     api_secret = serializers.CharField(write_only=True, required=False, allow_blank=True)
     is_demo = serializers.BooleanField(default=True)
+    user_email = serializers.CharField(write_only=True)
 
     class Meta:
         model = BrokerAccount
-        fields = ('provider', 'display_name', 'api_key', 'api_secret', 'is_demo')
+        fields = ('provider', 'display_name', 'api_key', 'api_secret', 'user_email', 'is_demo')
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -38,3 +43,17 @@ class BrokerAccountSerializer(serializers.ModelSerializer):
         account.set_api_key(api_key, api_secret)
         account.save()
         return account
+    
+class ListBrokerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrokerAccount
+        fields = [
+            'id',
+            'provider',
+            'display_name',
+            'encrypted_api_key',
+            'encrypted_api_secret',
+            'user',
+            'is_demo',
+            'created_at'
+        ]
