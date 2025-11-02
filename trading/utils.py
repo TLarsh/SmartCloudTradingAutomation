@@ -19,3 +19,42 @@ def require_user_key(request: Request):
     if user.secret_key != xkey:
         return None
     return user
+
+
+
+import os
+from cryptography.fernet import Fernet, InvalidToken
+from django.conf import settings
+
+# We require settings.FERNET_KEY to be set from environment.
+def _get_fernet():
+    key = getattr(settings, 'FERNET_KEY', None)
+    if not key:
+        raise RuntimeError("FERNET_KEY is not configured in Django settings")
+    if isinstance(key, str):
+        key = key.encode()
+    return Fernet(key)
+
+def encrypt_text(plaintext: str) -> str:
+    """
+    Encrypts plaintext and returns a url-safe base64 token string.
+    """
+    if plaintext is None:
+        return ''
+    f = _get_fernet()
+    token = f.encrypt(plaintext.encode())
+    return token.decode()
+
+def decrypt_text(token: str) -> str:
+    """
+    Decrypts token produced by encrypt_text.
+    """
+    if not token:
+        return ''
+    f = _get_fernet()
+    try:
+        data = f.decrypt(token.encode())
+    except InvalidToken:
+        raise RuntimeError("Invalid encryption token or wrong FERNET_KEY")
+    return data.decode()
+

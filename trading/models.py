@@ -2,13 +2,14 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
 from django.conf import settings
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
+from django.core.exceptions import ValidationError
 
-def _get_fernet():
-    key = settings.FERNET_KEY
-    if isinstance(key, str):
-        key = key.encode()
-    return Fernet(key)
+# def _get_fernet():
+#     key = settings.FERNET_KEY
+#     if isinstance(key, str):
+#         key = key.encode()
+#     return Fernet(key)
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -64,21 +65,51 @@ class BrokerAccount(models.Model):
     is_demo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def set_api_key(self, api_key, api_secret=None):
+    """
+    def set_api_key(self, api_key:str, api_secret:str = None):
+        if not api_key:
+            raise ValidationError("API key cannot be empty")
+        
         f = _get_fernet()
-        self.encrypted_api_key = f.encrypt(api_key.encode()).decode()
-        if api_secret is not None:
-            self.encrypted_api_secret = f.encrypt(api_secret.encode()).decode()
+        self.encrypted_api_key = f.encrypt(api_key.encode()) 
+    """
+        # if api_secret is not None:
+        #     self.encrypted_api_secret = f.encrypt(api_secret.encode()).decode()
 
+    """
     def get_api_key(self):
+        if not self.encrypted_api_key:
+            raise ValidationError("No API key found for this broker")
         f = _get_fernet()
-        return f.decrypt(self.encrypted_api_key.encode()).decode()
+        try:
+            return f.decrypt(self.encrypted_api_key.encode()).decode()
+        except InvalidToken:
+            raise ValidationError("Invalid Fernet key or corrupted API key data")
+    """ 
+    # def get_api_key(self):
+    #     if not self.encrypted_api_key:
+    #         raise ValidationError("No API key found for this broker")
+    #     f = _get_fernet()
+    #     try:
+    #         return f.decrypt(self.encrypted_api_key.encode()).decode()
+    #     except InvalidToken:
+    #         raise ValidationError("Invalid Fernet key or corrupted API key data")
+    
 
-    def get_api_secret(self):
-        if not self.encrypted_api_secret:
-            return None
-        f = _get_fernet()
-        return f.decrypt(self.encrypted_api_secret.encode()).decode()
+    # def get_api_key(self) -> str:
+    #     if not self.encrypted_api_key:
+    #         raise ValidationError("No API key found for this broker")
+    #     f = _get_fernet()
+    #     try:
+    #         return f.decrypt(self.encrypted_api_key.encode()).decode()
+    #     except InvalidToken:
+    #         raise ValidationError("Invalid Fernet key or corrupted API key data")
+
+    # def get_api_secret(self):
+    #     if not self.encrypted_api_secret:
+    #         return None
+    #     f = _get_fernet()
+    #     return f.decrypt(self.encrypted_api_secret.encode()).decode()
 
     def __str__(self):
         return f"{self.display_name} ({self.provider})"

@@ -28,6 +28,27 @@ class RegisterView(APIView):
         user = serializer.save()
         return Response({"message": "User registered", "status": True, "data": {"email": user.email, "secret_key": user.secret_key}, "errors": None}, status=201)
 
+# class AddBrokerView(APIView):
+#     """
+#     Requires header X-USER-KEY and user_email (in body or header)
+#     """
+
+#     @broker_register_schema
+
+#     def post(self, request):
+#         user = require_user_key(request)
+#         if not user:
+#             return Response({"message":"Unauthorized", "status":False, "data":None, "errors":"Invalid credentials"}, status=401)
+      
+#         request._cached_user = user  
+#         serializer = BrokerAccountSerializer(data=request.data, context={"request": request})
+#         if not serializer.is_valid():
+#             return Response({"message":"Validation failed","status":False,"data":None,"errors":serializer.errors}, status=400)
+#         account = serializer.save()
+#         return Response({"message":"Broker account added","status":True,"data":{"id":account.id,"provider":account.provider,"display_name":account.display_name},"errors":None}, status=201)
+
+
+
 class AddBrokerView(APIView):
     """
     Requires header X-USER-KEY and user_email (in body or header)
@@ -36,16 +57,27 @@ class AddBrokerView(APIView):
     @broker_register_schema
 
     def post(self, request):
+        user_email = request.data.get('user_email')
         user = require_user_key(request)
+        user_key = request.headers.get('X-USER-KEY')
         if not user:
             return Response({"message":"Unauthorized", "status":False, "data":None, "errors":"Invalid credentials"}, status=401)
       
         request._cached_user = user  
+
+        try:
+            broker = User.objects.get(email=user_email, secret_key=user_key)
+        except User.DoesNotExist:
+            print(broker)
+            # print({"email":broker.email, "key":broker.secret_key})
+            return Response({"message":"Invalid Credentials", "status":False, "data":"None", "errors":"Invalid Cedentials"})
+        
         serializer = BrokerAccountSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response({"message":"Validation failed","status":False,"data":None,"errors":serializer.errors}, status=400)
         account = serializer.save()
         return Response({"message":"Broker account added","status":True,"data":{"id":account.id,"provider":account.provider,"display_name":account.display_name},"errors":None}, status=201)
+
 
 class BrokerAccounts(APIView):
     def get(self, request):
@@ -98,17 +130,19 @@ class SignalWebhookView(APIView):
     
     def get(self, request):
         signals = Signal.objects.all()
+        signal_data = []
         for signal in signals:
-            return Response({
-            "message": 'Broker accounts retrieved successfully',
-            'status': True,
-            'data': {
+            signal_data.append({
                 'webhook_id':signal.webhook_id,
                 'user':signal.user.email,
                 'payload':signal.payload,
                 'processed':signal.processed,
-                'result':signal.result
-            },
+                'result':signal.result,
+            })
+            return Response({
+            "message": 'Broker accounts retrieved successfully',
+            'status': True,
+            'data' : signal_data,
             'errors': None,
         }, status=200)
 
